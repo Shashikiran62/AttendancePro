@@ -117,8 +117,8 @@ def add_face_page():
             st.error("Please enter all fields and take a picture.")
             return
         
-        # Read image from camera input
-        image = Image.open(img_file)
+        # Read image and convert to RGB NumPy array
+        image = Image.open(img_file).convert("RGB")
         image_np = np.array(image)
 
         # Get face encodings
