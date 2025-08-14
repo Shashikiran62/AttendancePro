@@ -105,30 +105,43 @@ def mark_present(name):
 def add_face_page():
     st.title("Add Face")
 
-    camera = cv2.VideoCapture(0)  # 0 for default webcam
-    if not camera.isOpened():
-        st.error("Could not access webcam. Please run locally and ensure it's not in use by another app.")
-        return
+    # Capture image from browser camera
+    img_file = st.camera_input("Take a picture")
 
-    st.info("Press 'c' to capture face, 'q' to quit.")
-    while True:
-        ret, frame = camera.read()
-        if not ret:
-            st.error("Failed to grab frame from camera.")
-            break
+    if img_file is not None:
+        # Convert to OpenCV format
+        file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, 1)
 
-        cv2.imshow("Camera", frame)
-        key = cv2.waitKey(1)
-        if key & 0xFF == ord('c'):
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cv2.imwrite("captured_face.jpg", gray)
-            st.success("Face captured successfully!")
-            break
-        elif key & 0xFF == ord('q'):
-            break
+        # Convert to grayscale for face detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    camera.release()
-    cv2.destroyAllWindows()
+        # Load Haar cascade for face detection
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+        if len(faces) == 0:
+            st.warning("No face detected. Please try again.")
+        else:
+            for (x, y, w, h) in faces:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            st.success(f"Detected {len(faces)} face(s)!")
+            
+            # Show detected face(s)
+            st.image(frame, channels="BGR")
+
+            # Save grayscale cropped faces for training
+            face_images = []
+            for (x, y, w, h) in faces:
+                face_img = gray[y:y + h, x:x + w]
+                face_images.append(face_img)
+
+            # Example: stack all detected faces into array
+            faces_data = np.array(face_images, dtype=object)  # Use object type for variable-sized faces
+            st.info(f"Captured {faces_data.shape[0]} face(s) for saving.")
+
+            # You can now call your save_face_data function
+            # save_face_data(name, phone, faces_data)
 
 def save_face_data(name, phone, faces_data):
     """Helper to save face, name, and phone data to pickle files."""
