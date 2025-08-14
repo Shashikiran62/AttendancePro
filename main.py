@@ -8,6 +8,7 @@ import cv2
 import time
 import csv
 import auth  # new import
+import face_recognition
 from datetime import datetime
 from twilio.rest import Client
 from PIL import Image
