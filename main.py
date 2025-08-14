@@ -132,6 +132,7 @@ def add_face_page():
         else:
             st.info("Starting camera... Press 'q' to stop.")
             st.info("Sorry in this host platform the live face detection and adding face cannot done ,we can only upload file")
+            st.info("But if i make upload option then it will useless of attendace ,Thanks for the trying")
             video = cv2.VideoCapture(0)
             facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
             faces_data = []
