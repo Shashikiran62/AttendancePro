@@ -19,6 +19,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 
 
+
+
 # If not logged in, show login UI
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     auth.auth_ui()
@@ -41,9 +43,15 @@ def load_attendance():
     all_data = []
     for file in attendance_files:
         df = pd.read_csv(f"Attendance/{file}")
+        # Ensure necessary columns
+        expected_cols = {'NAME', 'TIME', 'Method'}
+        missing = expected_cols - set(df.columns)
+        for col in missing:
+            df[col] = None
         df['Date'] = file.split('_')[1].replace('.csv', '')
         all_data.append(df)
     return pd.concat(all_data, ignore_index=True) if all_data else None
+
 
 def load_faces_data():
     if (
@@ -62,23 +70,34 @@ def load_faces_data():
 
 def remove_face(name):
     faces_data, names, phones = load_faces_data()
-    if faces_data is not None and names is not None:
+    if faces_data is not None and names is not None and phones is not None:
         if name in names:
+            # Find indices of the name to remove from faces_data
             indices = [i for i, n in enumerate(names) if n == name]
             faces_data = np.delete(faces_data, indices, axis=0)
-            names = [n for i, n in enumerate(names) if n != name]
-            phones = [p for i, p in enumerate(phones) if names[i] != name]
+
+            # Safely filter names and phones together
+            filtered_names = []
+            filtered_phones = []
+            for n, p in zip(names, phones):
+                if n != name:
+                    filtered_names.append(n)
+                    filtered_phones.append(p)
+
+            # Save updated lists
             with open('data/faces_data.pkl', 'wb') as f:
                 pickle.dump(faces_data, f)
             with open('data/names.pkl', 'wb') as f:
-                pickle.dump(names, f)
+                pickle.dump(filtered_names, f)
             with open('data/phones.pkl', 'wb') as f:
-                pickle.dump(phones, f)
+                pickle.dump(filtered_phones, f)
+
             st.success(f"Removed all entries for {name}")
         else:
             st.error(f"Name {name} not found.")
     else:
         st.error("Faces data not found.")
+
 
 def mark_present(name):
     ts = time.time()
@@ -224,7 +243,13 @@ def attendance_page():
             "Attendance Percentage": attendance_percentage
         })
     attendance_df = pd.DataFrame(attendance_summary)
-    st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
+
+    if not attendance_df.empty and all(col in attendance_df.columns for col in ['Name', 'Attendance Count', 'Attendance Percentage']):
+        st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
+    else:
+        st.warning("No attendance summary available yet.")
+        st.table(pd.DataFrame(columns=['Name', 'Attendance Count', 'Attendance Percentage']))
+
 # CSV download
     csv = attendance_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -256,8 +281,19 @@ def attendance_page():
     elements.append(Paragraph("Attendance Summary", styles['Title']))
 
     # Convert DataFrame to list for Table
-    data_for_pdf = [attendance_df.columns.tolist()] + attendance_df.values.tolist()
+    # Convert DataFrame to list for Table (always include header row)
+    data_for_pdf = [["Name", "Attendance Count", "Attendance Percentage"]]
+
+    if not attendance_df.empty:
+        for index, row in attendance_df.iterrows():
+            data_for_pdf.append([
+                row['Name'],
+                row['Attendance Count'],
+                row['Attendance Percentage']
+            ])
+
     table = Table(data_for_pdf)
+
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
