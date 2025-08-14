@@ -9,4 +9,4 @@ openpyxl
 Pillow
 python-dateutil
 bcrypt
-face_recognition
+
