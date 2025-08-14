@@ -10,6 +10,7 @@ import csv
 import auth  # new import
 from datetime import datetime
 from twilio.rest import Client
+from PIL import Image
 from streamlit_autorefresh import st_autorefresh
 from io import BytesIO
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
