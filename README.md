@@ -30,8 +30,12 @@ The system also includes **user authentication** and optional **SMS notification
 ---
 
 ## ⚙️ Installation
-
 1. **Clone the Repository**
    ```bash
    git clone https://github.com/your-username/attendance-pro.git
    cd attendance-pro
+2.**Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+3.**Directory Setup**
+Make sure these folders exist in the root:
