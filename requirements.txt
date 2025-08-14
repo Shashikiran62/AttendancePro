@@ -1,0 +1,8 @@
+streamlit
+opencv-python
+numpy
+pandas
+twilio
+streamlit-autorefresh
+reportlab
+openpyxl
