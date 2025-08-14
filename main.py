@@ -103,86 +103,32 @@ def mark_present(name):
     st.success(f"Marked {name} as present.")
 
 def add_face_page():
-    st.title("Face Registration")
-    name = st.text_input("Enter your Name:")
-    phone = st.text_input("Enter your Phone Number (demo - enter anything):")
+    st.title("Add Face")
 
-    mode = st.radio("Choose Input Method", ["Webcam (Local only)", "Upload Photo"])
+    camera = cv2.VideoCapture(0)  # 0 for default webcam
+    if not camera.isOpened():
+        st.error("Could not access webcam. Please run locally and ensure it's not in use by another app.")
+        return
 
-    if mode == "Upload Photo":
-        uploaded_file = st.file_uploader("Upload a clear face photo", type=["jpg", "jpeg", "png"])
-        if uploaded_file is not None:
-            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-            frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            if frame is None:
-                st.error("Could not read uploaded image.")
-                return
+    st.info("Press 'c' to capture face, 'q' to quit.")
+    while True:
+        ret, frame = camera.read()
+        if not ret:
+            st.error("Failed to grab frame from camera.")
+            break
 
-            facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
+        cv2.imshow("Camera", frame)
+        key = cv2.waitKey(1)
+        if key & 0xFF == ord('c'):
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = facesdetect.detectMultiScale(gray, 1.3, 5)
+            cv2.imwrite("captured_face.jpg", gray)
+            st.success("Face captured successfully!")
+            break
+        elif key & 0xFF == ord('q'):
+            break
 
-            if len(faces) == 0:
-                st.warning("No face detected in the uploaded image.")
-                return
-
-            faces_data = []
-            for (x, y, w, h) in faces:
-                crop_img = frame[y:y+h, x:x+w, :]
-                resized_img = cv2.resize(crop_img, (50, 50))
-                faces_data.append(resized_img)
-
-            faces_data = np.asarray(faces_data)
-            faces_data = faces_data.reshape(len(faces_data), -1)
-            save_face_data(name, phone, faces_data)
-            st.success(f"Face data for {name} added successfully from uploaded photo!")
-
-    elif mode == "Webcam (Local only)":
-        if st.button("Start Webcam Capture"):
-            if not name.strip() or not phone.strip():
-                st.error("Please enter both Name and Phone Number.")
-                return
-
-            video = cv2.VideoCapture(0)
-            if not video.isOpened():
-                st.error("Could not access webcam. Make sure you're running locally and the webcam is free.")
-                return
-
-            facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
-            faces_data = []
-            i = 0
-
-            while True:
-                ret, frame = video.read()
-                if not ret or frame is None:
-                    st.error("Failed to capture frame from webcam.")
-                    break
-
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                faces = facesdetect.detectMultiScale(gray, 1.3, 5)
-                for (x, y, w, h) in faces:
-                    crop_img = frame[y:y+h, x:x+w, :]
-                    resized_img = cv2.resize(crop_img, (50, 50))
-                    if len(faces_data) <= 100 and i % 10 == 0:
-                        faces_data.append(resized_img)
-                    i += 1
-                    cv2.putText(frame, str(len(faces_data)), (50, 50),
-                                cv2.FONT_HERSHEY_COMPLEX, 1, (50, 50, 255), 1)
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (50, 50, 255), 1)
-
-                cv2.imshow("Face Capture", frame)
-                k = cv2.waitKey(1)
-                if k == ord('q') or len(faces_data) == 100:
-                    break
-
-            video.release()
-            cv2.destroyAllWindows()
-
-            if faces_data:
-                faces_data = np.asarray(faces_data)
-                faces_data = faces_data.reshape(len(faces_data), -1)
-                save_face_data(name, phone, faces_data)
-                st.success(f"Face data for {name} added successfully from webcam!")
+    camera.release()
+    cv2.destroyAllWindows()
 
 def save_face_data(name, phone, faces_data):
     """Helper to save face, name, and phone data to pickle files."""
