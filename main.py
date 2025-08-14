@@ -41,9 +41,15 @@ def load_attendance():
     all_data = []
     for file in attendance_files:
         df = pd.read_csv(f"Attendance/{file}")
+        # Ensure necessary columns
+        expected_cols = {'NAME', 'TIME', 'Method'}
+        missing = expected_cols - set(df.columns)
+        for col in missing:
+            df[col] = None
         df['Date'] = file.split('_')[1].replace('.csv', '')
         all_data.append(df)
     return pd.concat(all_data, ignore_index=True) if all_data else None
+
 
 def load_faces_data():
     if (
@@ -224,7 +230,13 @@ def attendance_page():
             "Attendance Percentage": attendance_percentage
         })
     attendance_df = pd.DataFrame(attendance_summary)
-    st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
+
+    if not attendance_df.empty and all(col in attendance_df.columns for col in ['Name', 'Attendance Count', 'Attendance Percentage']):
+        st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
+    else:
+        st.warning("No attendance summary available yet.")
+        st.table(pd.DataFrame(columns=['Name', 'Attendance Count', 'Attendance Percentage']))
+
 # CSV download
     csv = attendance_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -256,8 +268,19 @@ def attendance_page():
     elements.append(Paragraph("Attendance Summary", styles['Title']))
 
     # Convert DataFrame to list for Table
-    data_for_pdf = [attendance_df.columns.tolist()] + attendance_df.values.tolist()
+    # Convert DataFrame to list for Table (always include header row)
+    data_for_pdf = [["Name", "Attendance Count", "Attendance Percentage"]]
+
+    if not attendance_df.empty:
+        for index, row in attendance_df.iterrows():
+            data_for_pdf.append([
+                row['Name'],
+                row['Attendance Count'],
+                row['Attendance Percentage']
+            ])
+
     table = Table(data_for_pdf)
+
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
