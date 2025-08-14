@@ -105,25 +105,59 @@ def mark_present(name):
 def add_face_page():
     st.title("Face Registration")
     name = st.text_input("Enter your Name:")
-    phone = st.text_input("Enter your Phone Number(this is demo so you can enter anything here):")
+    phone = st.text_input("Enter your Phone Number (demo - enter anything):")
 
-    if st.button("Submit"):
-        if phone:  # only runs if the user entered something
-            st.write(f"Phone number entered: {phone}")
-        else:
-            st.write("No phone number provided.")
+    mode = st.radio("Choose Input Method", ["Webcam (Local only)", "Upload Photo"])
 
-    if st.button("Add Face"):
-        if not name.strip() or not phone.strip():
-            st.error("Please enter both Name and Phone Number.")
-        else:
-            st.info("Starting camera... Press 'q' to stop.")
+    if mode == "Upload Photo":
+        uploaded_file = st.file_uploader("Upload a clear face photo", type=["jpg", "jpeg", "png"])
+        if uploaded_file is not None:
+            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+            frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            if frame is None:
+                st.error("Could not read uploaded image.")
+                return
+
+            facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = facesdetect.detectMultiScale(gray, 1.3, 5)
+
+            if len(faces) == 0:
+                st.warning("No face detected in the uploaded image.")
+                return
+
+            faces_data = []
+            for (x, y, w, h) in faces:
+                crop_img = frame[y:y+h, x:x+w, :]
+                resized_img = cv2.resize(crop_img, (50, 50))
+                faces_data.append(resized_img)
+
+            faces_data = np.asarray(faces_data)
+            faces_data = faces_data.reshape(len(faces_data), -1)
+            save_face_data(name, phone, faces_data)
+            st.success(f"Face data for {name} added successfully from uploaded photo!")
+
+    elif mode == "Webcam (Local only)":
+        if st.button("Start Webcam Capture"):
+            if not name.strip() or not phone.strip():
+                st.error("Please enter both Name and Phone Number.")
+                return
+
             video = cv2.VideoCapture(0)
+            if not video.isOpened():
+                st.error("Could not access webcam. Make sure you're running locally and the webcam is free.")
+                return
+
             facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
             faces_data = []
             i = 0
+
             while True:
                 ret, frame = video.read()
+                if not ret or frame is None:
+                    st.error("Failed to capture frame from webcam.")
+                    break
+
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = facesdetect.detectMultiScale(gray, 1.3, 5)
                 for (x, y, w, h) in faces:
@@ -135,45 +169,54 @@ def add_face_page():
                     cv2.putText(frame, str(len(faces_data)), (50, 50),
                                 cv2.FONT_HERSHEY_COMPLEX, 1, (50, 50, 255), 1)
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (50, 50, 255), 1)
+
                 cv2.imshow("Face Capture", frame)
                 k = cv2.waitKey(1)
                 if k == ord('q') or len(faces_data) == 100:
                     break
+
             video.release()
             cv2.destroyAllWindows()
-            faces_data = np.asarray(faces_data)
-            faces_data = faces_data.reshape(100, -1)
-            if 'names.pkl' not in os.listdir('data/'):
-                names = [name] * 100
-                with open('data/names.pkl', 'wb') as f:
-                    pickle.dump(names, f)
-            else:
-                with open('data/names.pkl', 'rb') as f:
-                    names = pickle.load(f)
-                names = names + [name] * 100
-                with open('data/names.pkl', 'wb') as f:
-                    pickle.dump(names, f)
-            if 'phones.pkl' not in os.listdir('data/'):
-                phones = [phone] * 100
-                with open('data/phones.pkl', 'wb') as f:
-                    pickle.dump(phones, f)
-            else:
-                with open('data/phones.pkl', 'rb') as f:
-                    phones = pickle.load(f)
-                phones = phones + [phone] * 100
-                with open('data/phones.pkl', 'wb') as f:
-                    pickle.dump(phones, f)
-            if 'faces_data.pkl' not in os.listdir('data/'):
-                with open('data/faces_data.pkl', 'wb') as f:
-                    pickle.dump(faces_data, f)
-            else:
-                with open('data/faces_data.pkl', 'rb') as f:
-                    faces = pickle.load(f)
-                faces = np.append(faces, faces_data, axis=0)
-                with open('data/faces_data.pkl', 'wb') as f:
-                    pickle.dump(faces, f)
-            st.success(f"Face data for {name} added successfully!")
-    # st.subheader(f"(To show Demo i have not included the Login pages)")
+
+            if faces_data:
+                faces_data = np.asarray(faces_data)
+                faces_data = faces_data.reshape(len(faces_data), -1)
+                save_face_data(name, phone, faces_data)
+                st.success(f"Face data for {name} added successfully from webcam!")
+
+def save_face_data(name, phone, faces_data):
+    """Helper to save face, name, and phone data to pickle files."""
+    # Save names
+    if 'names.pkl' not in os.listdir('data/'):
+        names = [name] * faces_data.shape[0]
+    else:
+        with open('data/names.pkl', 'rb') as f:
+            names = pickle.load(f)
+        names += [name] * faces_data.shape[0]
+    with open('data/names.pkl', 'wb') as f:
+        pickle.dump(names, f)
+
+    # Save phones
+    if 'phones.pkl' not in os.listdir('data/'):
+        phones = [phone] * faces_data.shape[0]
+    else:
+        with open('data/phones.pkl', 'rb') as f:
+            phones = pickle.load(f)
+        phones += [phone] * faces_data.shape[0]
+    with open('data/phones.pkl', 'wb') as f:
+        pickle.dump(phones, f)
+
+    # Save face data
+    if 'faces_data.pkl' not in os.listdir('data/'):
+        with open('data/faces_data.pkl', 'wb') as f:
+            pickle.dump(faces_data, f)
+    else:
+        with open('data/faces_data.pkl', 'rb') as f:
+            existing_faces = pickle.load(f)
+        updated_faces = np.append(existing_faces, faces_data, axis=0)
+        with open('data/faces_data.pkl', 'wb') as f:
+            pickle.dump(updated_faces, f)
+
 
 def attendance_page():
     df_all_attendance = load_attendance()
