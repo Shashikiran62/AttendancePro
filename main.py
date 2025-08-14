@@ -106,45 +106,43 @@ def mark_present(name):
 def add_face_page():
     st.title("Add New Face")
 
+    # Input fields
     name = st.text_input("Enter Name")
     phone = st.text_input("Enter Phone Number")
-    
-    # Capture live image from webcam
-    img_file = st.camera_input("Take a picture")
 
-    if st.button("Save Face"):
-        if not name or not phone or not img_file:
-            st.error("Please enter all fields and take a picture.")
-            return
-        
-        # Read image and convert to RGB NumPy array
-        image = Image.open(img_file).convert("RGB")
+    # Take picture from camera
+    img_file = st.camera_input("Take a Picture")
+
+    if img_file is not None:
+        # Convert image to numpy
+        image = Image.open(img_file)
         image_np = np.array(image)
 
-        # Get face encodings
+        # Detect and encode faces
         face_encodings = face_recognition.face_encodings(image_np)
-        if len(face_encodings) == 0:
-            st.error("No face detected in the image.")
-            return
-        
-        encoding = face_encodings[0]
+        if len(face_encodings) > 0:
+            st.success("Face detected successfully!")
 
-        # Save to file
-        data_file = "face_data.pkl"
-        if os.path.exists(data_file):
-            with open(data_file, "rb") as f:
-                data = pickle.load(f)
+            if st.button("Save Face Data"):
+                encoding = face_encodings[0]
+
+                # Save encodings and names to pickle
+                if os.path.exists("faces.pkl"):
+                    with open("faces.pkl", "rb") as f:
+                        known_faces = pickle.load(f)
+                else:
+                    known_faces = {"encodings": [], "names": [], "phones": []}
+
+                known_faces["encodings"].append(encoding)
+                known_faces["names"].append(name)
+                known_faces["phones"].append(phone)
+
+                with open("faces.pkl", "wb") as f:
+                    pickle.dump(known_faces, f)
+
+                st.success(f"Face for {name} saved successfully!")
         else:
-            data = {"encodings": [], "names": [], "phones": []}
-        
-        data["encodings"].append(encoding)
-        data["names"].append(name)
-        data["phones"].append(phone)
-
-        with open(data_file, "wb") as f:
-            pickle.dump(data, f)
-
-        st.success(f"Face for {name} saved successfully!")
+            st.error("No face detected. Please try again.")
 
 def save_face_data(name, phone, faces_data):
     """Helper to save face, name, and phone data to pickle files."""
