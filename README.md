@@ -1,4 +1,4 @@
-# 📸 Attendance Pro(🚀 [**Live Demo**]([https://www.google.in](https://attendancepro-mit3zvangi8nts9ygg3gle.streamlit.app/)))
+# 📸 Attendance Pro(🚀 [**Live Demo**]([[https://www.google.in](https://attendancepro-mit3zvangi8nts9ygg3gle.streamlit.app/)]))
 
 
 **Attendance Pro** is a **facial recognition-based attendance management system** built with **Python**, **Streamlit**, and **OpenCV**.  
