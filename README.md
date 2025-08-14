@@ -39,12 +39,18 @@ The system also includes **user authentication** and optional **SMS notification
     pip install -r requirements.txt
 
 3.**Directory Setup**
-   Make sure these folders exist in the root:
+      Make sure these folders exist in the root.
+      
 4.**Download Haar Cascade from OpenCV GitHub**
     ```haarcascade_frontalface_default.xml```
 
+
+---
+
 ##Start the App🚀
 ```streamlit run main.py```
+
+---
 
 ##⚠️ Notes
 1.Twilio SMS – Disabled by default for security (requires paid account).
@@ -52,10 +58,14 @@ The system also includes **user authentication** and optional **SMS notification
 3.Face Data – Each registered face creates 100 samples saved in .pkl files.
 4.Lighting & Camera Quality – Directly affect recognition accuracy.
 
+---
+
 ##🚫 Limitations
 1.Uses a simple KNN classifier — accuracy may be limited; consider upgrading to deep learning for production.
 2.SMS notifications require paid Twilio account.
 3.TTS feature is Windows-specific.
+
+---
 
 ##🙏 Acknowledgments
 1.OpenCV – Face detection & image processing
