@@ -8,10 +8,8 @@ import cv2
 import time
 import csv
 import auth  # new import
-import face_recognition
 from datetime import datetime
 from twilio.rest import Client
-from PIL import Image
 from streamlit_autorefresh import st_autorefresh
 from io import BytesIO
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
@@ -43,15 +41,9 @@ def load_attendance():
     all_data = []
     for file in attendance_files:
         df = pd.read_csv(f"Attendance/{file}")
-        # Ensure necessary columns
-        expected_cols = {'NAME', 'TIME', 'Method'}
-        missing = expected_cols - set(df.columns)
-        for col in missing:
-            df[col] = None
         df['Date'] = file.split('_')[1].replace('.csv', '')
         all_data.append(df)
     return pd.concat(all_data, ignore_index=True) if all_data else None
-
 
 def load_faces_data():
     if (
@@ -105,79 +97,77 @@ def mark_present(name):
     st.success(f"Marked {name} as present.")
 
 def add_face_page():
-    st.title("Add New Face")
+    st.title("Face Registration")
+    name = st.text_input("Enter your Name:")
+    phone = st.text_input("Enter your Phone Number(this is demo so you can enter anything here):")
 
-    # Input fields
-    name = st.text_input("Enter Name")
-    phone = st.text_input("Enter Phone Number")
-
-    # Take picture from camera
-    img_file = st.camera_input("Take a Picture")
-
-    if img_file is not None:
-        # Convert image to numpy
-        image = Image.open(img_file)
-        image_np = np.array(image)
-
-        # Detect and encode faces
-        face_encodings = face_recognition.face_encodings(image_np)
-        if len(face_encodings) > 0:
-            st.success("Face detected successfully!")
-
-            if st.button("Save Face Data"):
-                encoding = face_encodings[0]
-
-                # Save encodings and names to pickle
-                if os.path.exists("faces.pkl"):
-                    with open("faces.pkl", "rb") as f:
-                        known_faces = pickle.load(f)
-                else:
-                    known_faces = {"encodings": [], "names": [], "phones": []}
-
-                known_faces["encodings"].append(encoding)
-                known_faces["names"].append(name)
-                known_faces["phones"].append(phone)
-
-                with open("faces.pkl", "wb") as f:
-                    pickle.dump(known_faces, f)
-
-                st.success(f"Face for {name} saved successfully!")
+    if st.button("Submit"):
+        if phone:  # only runs if the user entered something
+            st.write(f"Phone number entered: {phone}")
         else:
-            st.error("No face detected. Please try again.")
+            st.write("No phone number provided.")
 
-def save_face_data(name, phone, faces_data):
-    """Helper to save face, name, and phone data to pickle files."""
-    # Save names
-    if 'names.pkl' not in os.listdir('data/'):
-        names = [name] * faces_data.shape[0]
-    else:
-        with open('data/names.pkl', 'rb') as f:
-            names = pickle.load(f)
-        names += [name] * faces_data.shape[0]
-    with open('data/names.pkl', 'wb') as f:
-        pickle.dump(names, f)
-
-    # Save phones
-    if 'phones.pkl' not in os.listdir('data/'):
-        phones = [phone] * faces_data.shape[0]
-    else:
-        with open('data/phones.pkl', 'rb') as f:
-            phones = pickle.load(f)
-        phones += [phone] * faces_data.shape[0]
-    with open('data/phones.pkl', 'wb') as f:
-        pickle.dump(phones, f)
-
-    # Save face data
-    if 'faces_data.pkl' not in os.listdir('data/'):
-        with open('data/faces_data.pkl', 'wb') as f:
-            pickle.dump(faces_data, f)
-    else:
-        with open('data/faces_data.pkl', 'rb') as f:
-            existing_faces = pickle.load(f)
-        updated_faces = np.append(existing_faces, faces_data, axis=0)
-        with open('data/faces_data.pkl', 'wb') as f:
-            pickle.dump(updated_faces, f)
-
+    if st.button("Add Face"):
+        if not name.strip() or not phone.strip():
+            st.error("Please enter both Name and Phone Number.")
+        else:
+            st.info("Starting camera... Press 'q' to stop.")
+            video = cv2.VideoCapture(0)
+            facesdetect = cv2.CascadeClassifier('data/haarcascade_frontalface_default.xml')
+            faces_data = []
+            i = 0
+            while True:
+                ret, frame = video.read()
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = facesdetect.detectMultiScale(gray, 1.3, 5)
+                for (x, y, w, h) in faces:
+                    crop_img = frame[y:y+h, x:x+w, :]
+                    resized_img = cv2.resize(crop_img, (50, 50))
+                    if len(faces_data) <= 100 and i % 10 == 0:
+                        faces_data.append(resized_img)
+                    i += 1
+                    cv2.putText(frame, str(len(faces_data)), (50, 50),
+                                cv2.FONT_HERSHEY_COMPLEX, 1, (50, 50, 255), 1)
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (50, 50, 255), 1)
+                cv2.imshow("Face Capture", frame)
+                k = cv2.waitKey(1)
+                if k == ord('q') or len(faces_data) == 100:
+                    break
+            video.release()
+            cv2.destroyAllWindows()
+            faces_data = np.asarray(faces_data)
+            faces_data = faces_data.reshape(100, -1)
+            if 'names.pkl' not in os.listdir('data/'):
+                names = [name] * 100
+                with open('data/names.pkl', 'wb') as f:
+                    pickle.dump(names, f)
+            else:
+                with open('data/names.pkl', 'rb') as f:
+                    names = pickle.load(f)
+                names = names + [name] * 100
+                with open('data/names.pkl', 'wb') as f:
+                    pickle.dump(names, f)
+            if 'phones.pkl' not in os.listdir('data/'):
+                phones = [phone] * 100
+                with open('data/phones.pkl', 'wb') as f:
+                    pickle.dump(phones, f)
+            else:
+                with open('data/phones.pkl', 'rb') as f:
+                    phones = pickle.load(f)
+                phones = phones + [phone] * 100
+                with open('data/phones.pkl', 'wb') as f:
+                    pickle.dump(phones, f)
+            if 'faces_data.pkl' not in os.listdir('data/'):
+                with open('data/faces_data.pkl', 'wb') as f:
+                    pickle.dump(faces_data, f)
+            else:
+                with open('data/faces_data.pkl', 'rb') as f:
+                    faces = pickle.load(f)
+                faces = np.append(faces, faces_data, axis=0)
+                with open('data/faces_data.pkl', 'wb') as f:
+                    pickle.dump(faces, f)
+            st.success(f"Face data for {name} added successfully!")
+    # st.subheader(f"(To show Demo i have not included the Login pages)")
 
 def attendance_page():
     df_all_attendance = load_attendance()
@@ -234,13 +224,7 @@ def attendance_page():
             "Attendance Percentage": attendance_percentage
         })
     attendance_df = pd.DataFrame(attendance_summary)
-
-    if not attendance_df.empty and all(col in attendance_df.columns for col in ['Name', 'Attendance Count', 'Attendance Percentage']):
-        st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
-    else:
-        st.warning("No attendance summary available yet.")
-        st.table(pd.DataFrame(columns=['Name', 'Attendance Count', 'Attendance Percentage']))
-
+    st.table(attendance_df[['Name', 'Attendance Count', 'Attendance Percentage']])
 # CSV download
     csv = attendance_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -272,19 +256,8 @@ def attendance_page():
     elements.append(Paragraph("Attendance Summary", styles['Title']))
 
     # Convert DataFrame to list for Table
-    # Convert DataFrame to list for Table (always include header row)
-    data_for_pdf = [["Name", "Attendance Count", "Attendance Percentage"]]
-
-    if not attendance_df.empty:
-        for index, row in attendance_df.iterrows():
-            data_for_pdf.append([
-                row['Name'],
-                row['Attendance Count'],
-                row['Attendance Percentage']
-            ])
-
+    data_for_pdf = [attendance_df.columns.tolist()] + attendance_df.values.tolist()
     table = Table(data_for_pdf)
-
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.gray),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
