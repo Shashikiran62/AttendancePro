@@ -103,45 +103,52 @@ def mark_present(name):
     st.success(f"Marked {name} as present.")
 
 def add_face_page():
-    st.title("Add Face")
+    st.header("Add New Face")
 
-    # Capture image from browser camera
-    img_file = st.camera_input("Take a picture")
+    name = st.text_input("Enter Name")
+    phone = st.text_input("Enter Phone Number")
 
-    if img_file is not None:
-        # Convert to OpenCV format
-        file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
-        frame = cv2.imdecode(file_bytes, 1)
+    img_file = st.camera_input("Take a photo")
 
-        # Convert to grayscale for face detection
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if st.button("Save Face"):
+        if not name or not phone:
+            st.error("Please enter both name and phone number.")
+            return
 
-        # Load Haar cascade for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        if img_file is None:
+            st.error("Please take a photo before saving.")
+            return
 
-        if len(faces) == 0:
-            st.warning("No face detected. Please try again.")
+        # Convert to a format face_recognition understands
+        image = Image.open(img_file)
+        image = np.array(image)
+
+        # Detect and encode face
+        face_locations = face_recognition.face_locations(image)
+        if len(face_locations) == 0:
+            st.error("No face detected in the photo.")
+            return
+
+        encoding = face_recognition.face_encodings(image, known_face_locations=face_locations)[0]
+
+        # Load existing data if file exists
+        data_file = "face_data.pkl"
+        if os.path.exists(data_file):
+            with open(data_file, "rb") as f:
+                all_encodings, all_names, all_phones = pickle.load(f)
         else:
-            for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-            st.success(f"Detected {len(faces)} face(s)!")
-            
-            # Show detected face(s)
-            st.image(frame, channels="BGR")
+            all_encodings, all_names, all_phones = [], [], []
 
-            # Save grayscale cropped faces for training
-            face_images = []
-            for (x, y, w, h) in faces:
-                face_img = gray[y:y + h, x:x + w]
-                face_images.append(face_img)
+        # Append new data
+        all_encodings.append(encoding)
+        all_names.append(name)
+        all_phones.append(phone)
 
-            # Example: stack all detected faces into array
-            faces_data = np.array(face_images, dtype=object)  # Use object type for variable-sized faces
-            st.info(f"Captured {faces_data.shape[0]} face(s) for saving.")
+        # Save back to pickle
+        with open(data_file, "wb") as f:
+            pickle.dump((all_encodings, all_names, all_phones), f)
 
-            # You can now call your save_face_data function
-            # save_face_data(name, phone, faces_data)
+        st.success(f"Face data for {name} saved successfully!")
 
 def save_face_data(name, phone, faces_data):
     """Helper to save face, name, and phone data to pickle files."""
