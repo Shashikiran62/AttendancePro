@@ -1,4 +1,4 @@
-# 📸 Attendance Pro 
+# 📸 Attendance Pro :
 
 
 **Attendance Pro** is a **facial recognition-based attendance management system** built with **Python**, **Streamlit**, and **OpenCV**.  
